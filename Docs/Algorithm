@@ -1,0 +1,70 @@
+# Smart Parking System Algorithm
+
+## 1. Setup
+
+N = total number of slots in the lot
+availableSlots = min-heap containing slot ids {1, 2, ..., N}
+activeTickets = hash map: vehiclePlate -> Ticket{slotId, entryTime, vehicleType}
+rateTable = hash map: vehicleType -> (firstHourRate, extraHourRate)
+
+
+## 2. Check Availability (before entry)
+
+FUNCTION checkAvailability():
+freeCount = size(availableSlots)
+RETURN (freeCount > 0, freeCount)
+
+Cost: O(1). This is what a display board or mobile app polls continuously.
+
+## 3. Vehicle Entry
+
+FUNCTION vehicleEntry(plate, vehicleType):
+IF activeTickets.contains(plate):
+RETURN ERROR "Vehicle already parked"
+
+IF isEmpty(availableSlots):
+    RETURN ERROR "Parking Full"
+
+slotId    = heap_pop_min(availableSlots)      # lowest free slot, O(log N)
+entryTime = now()
+ticket    = Ticket(plate, slotId, entryTime, vehicleType)
+
+activeTickets.put(plate, ticket)               # O(1)
+DB.insert(vehicle, slot_status=OCCUPIED, transaction row with entry_time)
+
+RETURN ticket   # tells the driver which slot to go to
+
+## 4. Vehicle Exit
+
+FUNCTION vehicleExit(plate):
+IF NOT activeTickets.contains(plate):
+RETURN ERROR "Ticket not found"
+
+ticket    = activeTickets.remove(plate)         # O(1)
+exitTime  = now()
+duration  = exitTime - ticket.entryTime          # in seconds
+hours     = CEIL(duration / 3600)                # partial hour billed as full hour
+fee       = computeFee(ticket.vehicleType, hours)
+
+heap_push(availableSlots, ticket.slotId)         # slot is free again, O(log N)
+DB.update(transaction row: exit_time, duration, amount_paid = fee)
+DB.update(slot: status = FREE)
+
+RETURN (duration, fee)
+
+FUNCTION computeFee(vehicleType, hours):
+(firstHourRate, extraHourRate) = rateTable[vehicleType]
+IF hours <= 1:
+RETURN firstHourRate
+RETURN firstHourRate + (hours - 1) * extraHourRate
+
+
+## 5. Complexity Summary
+| Operation            | Time Complexity |
+|-----------------------|------------------|
+| Check availability    | O(1) |
+| Vehicle entry          | O(log N)  heap pop |
+| Vehicle exit           | O(log N)  heap push, O(1) lookup |
+| Fee calculation        | O(1) |
+
+`N` = number of slots, so even a 10,000-slot facility responds in microseconds.
