@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MMU Parking System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>🅿️ MMU Parking System</h1>
+        <p class="subtitle">Real-time availability &middot; automated entry/exit &middot; barrier control</p>
+    </header>
+
+    <!-- Flash messages: results of entry/exit actions -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Module 1: Slot Availability & Display -->
+    <section class="card">
+        <h2>Live Availability</h2>
+        <p class="big-status">
+            <span class="free-count">{{ status.free }}</span> / {{ status.total }} slots available
+        </p>
+        <div class="slot-grid">
+            {% for slot in status.slots %}
+                <div class="slot {{ 'free' if slot.status == 'FREE' else 'occupied' }}" title="Slot {{ slot.number }}">
+                    {{ slot.number }}
+                </div>
+            {% endfor %}
+        </div>
+        <p class="legend"><span class="dot free"></span> Free &nbsp; <span class="dot occupied"></span> Occupied</p>
+    </section>
+
+    <div class="columns">
+        <!-- Module 2: Vehicle Entry -->
+        <section class="card">
+            <h2>Vehicle Entry</h2>
+            <form method="POST" action="{{ url_for('entry') }}">
+                <label>Number Plate</label>
+                <input type="text" name="plate" placeholder="e.g. KAA 123A" required>
+
+                <label>Vehicle Type</label>
+                <select name="vehicle_type">
+                    <option value="CAR">Car</option>
+                    <option value="BIKE">Bike</option>
+                    <option value="TRUCK">Truck</option>
+                </select>
+
+                <button type="submit">Enter Parking</button>
+            </form>
+        </section>
+
+        <!-- Module 3 & 4: Fee Calculation + Payment / Barrier Control -->
+        <section class="card">
+            <h2>Vehicle Exit</h2>
+            <form method="POST" action="{{ url_for('calculate') }}">
+                <label>Number Plate</label>
+                <input type="text" name="plate" placeholder="e.g. KAA 123A" required>
+                <button type="submit">Calculate Fee</button>
+            </form>
+
+            {% if quote %}
+            <div class="quote-box">
+                <p><strong>{{ quote.plate }}</strong> — Slot {{ quote.slot }}</p>
+                <p>Duration: {{ quote.duration_minutes }} minutes</p>
+                <p class="fee">Amount due: Ksh {{ quote.fee }}</p>
+                <form method="POST" action="{{ url_for('exit_vehicle') }}">
+                    <input type="hidden" name="plate" value="{{ quote.plate }}">
+                    <input type="hidden" name="amount_paid" value="{{ quote.fee }}">
+                    <button type="submit" class="pay-btn">Pay Ksh {{ quote.fee }} &amp; Open Barrier</button>
+                </form>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+
+    <footer>
+        <p>Fee tiers: Free up to 30 min &middot; Ksh 50 up to 2 hrs &middot; Ksh 100 up to 4 hrs &middot; Ksh 300 up to 6 hrs &middot; Ksh 500 over 6 hrs</p>
+    </footer>
+</body>
+</html>
